@@ -1,0 +1,8 @@
+.pio
+.vscode
+*.pyc
+.DS_Store
+node_modules
+dist
+build
+include/secrets.h

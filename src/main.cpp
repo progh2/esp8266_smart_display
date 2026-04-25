@@ -233,12 +233,19 @@ public:
   int targetX, targetRotation;
   unsigned long lastDrop = 0;
   int score = 0;
+  
+  bool isGameOver = false;
+  int gameOverPhase = 0; // 1: 위에서 아래로 채우기, 2: 아래에서 위로 지우기
+  int gameOverY = 0;
+  unsigned long lastGameOverStep = 0;
 
   TetrisGame() { reset(); }
 
   void reset() {
     memset(board, 0, sizeof(board));
     score = 0;
+    isGameOver = false;
+    gameOverPhase = 0;
     spawnPiece();
   }
 
@@ -248,7 +255,11 @@ public:
     pieceY = 0;
     rotation = 0;
     calculateBestMove();
-    if (checkCollision(pieceX, pieceY, rotation)) reset();
+    if (checkCollision(pieceX, pieceY, rotation)) {
+      isGameOver = true;
+      gameOverPhase = 1;
+      gameOverY = 0;
+    }
   }
 
   bool checkCollision(int x, int y, int r, int p = -1) {
@@ -297,6 +308,27 @@ public:
   }
 
   void update() {
+    if (isGameOver) {
+      if (millis() - lastGameOverStep > 30) { // 애니메이션 속도 조절
+        if (gameOverPhase == 1) {
+          for (int x = 0; x < BOARD_WIDTH; x++) board[x][gameOverY] = 1;
+          gameOverY++;
+          if (gameOverY >= BOARD_HEIGHT) {
+            gameOverPhase = 2;
+            gameOverY = BOARD_HEIGHT - 1;
+          }
+        } else if (gameOverPhase == 2) {
+          for (int x = 0; x < BOARD_WIDTH; x++) board[x][gameOverY] = 0;
+          gameOverY--;
+          if (gameOverY < 0) {
+            reset(); // 애니메이션 완료 후 새 게임 시작
+          }
+        }
+        lastGameOverStep = millis();
+      }
+      return; // 게임 오버 애니메이션 중에는 일반 로직 스킵
+    }
+
     if (millis() - lastDrop > 100) {
       if (rotation != targetRotation) rotation = (rotation + 1) % 4;
       else if (pieceX < targetX) pieceX++;
@@ -342,11 +374,13 @@ public:
       for (int y = 0; y < BOARD_HEIGHT; y++)
         if (board[x][y]) mx->setPoint(x, 31 - y, true);
 
-    for (int i = 0; i < 4; i++) {
-      int px = PIECES[currentPiece][i][0];
-      int py = PIECES[currentPiece][i][1];
-      for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
-      mx->setPoint(pieceX + px, 31 - (pieceY + py), true);
+    if (!isGameOver) {
+      for (int i = 0; i < 4; i++) {
+        int px = PIECES[currentPiece][i][0];
+        int py = PIECES[currentPiece][i][1];
+        for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
+        mx->setPoint(pieceX + px, 31 - (pieceY + py), true);
+      }
     }
     
     // 화면에 한 번에 출력

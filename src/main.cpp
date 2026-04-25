@@ -337,13 +337,13 @@ public:
     mx->clear();
     for (int x = 0; x < BOARD_WIDTH; x++)
       for (int y = 0; y < BOARD_HEIGHT; y++)
-        if (board[x][y]) mx->setPoint(31 - y, x, true);
+        if (board[x][y]) mx->setPoint(x, 31 - y, true);
 
     for (int i = 0; i < 4; i++) {
       int px = PIECES[currentPiece][i][0];
       int py = PIECES[currentPiece][i][1];
       for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
-      mx->setPoint(31 - (pieceY + py), pieceX + px, true);
+      mx->setPoint(pieceX + px, 31 - (pieceY + py), true);
     }
   }
 };

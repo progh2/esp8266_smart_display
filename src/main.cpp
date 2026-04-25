@@ -423,31 +423,25 @@ void loop() {
   }
   
   if (!hasNewMessage && (millis() - lastModeChange > MODE_INTERVAL)) {
-    currentMode = (currentMode + 1) % 3; 
+    currentMode = (currentMode + 1) % 2; // OLED용 모드 (0, 1만 순환)
     lastModeChange = millis();
-    myDisplay.displayClear();
-    if (currentMode == TETRIS_MODE) tetris.reset();
   }
 
-  if (currentMode == TETRIS_MODE) {
+  // 매트릭스 제어
+  if (hasNewMessage) {
+    if (myDisplay.displayAnimate()) {
+      // 메시지 출력이 완료되면 자동으로 테트리스로 돌아가도록 설정
+      if (millis() - messageDisplayTime > MESSAGE_DURATION) {
+        hasNewMessage = false;
+        myDisplay.displayClear();
+      } else {
+        myDisplay.displayReset();
+      }
+    }
+  } else {
+    // 메시지가 없을 때는 항상 테트리스 실행
     tetris.update();
     tetris.draw(myDisplay.getGraphicObject());
-  } else if (myDisplay.displayAnimate()) {
-    if (hasNewMessage) {
-      myDisplay.displayReset();
-    } else {
-      // 전역/정적 버퍼를 사용하여 메모리 누수 및 포인터 오류 방지
-      static char matrixMsg[40];
-      snprintf(matrixMsg, sizeof(matrixMsg), "YT: %d    ", ytSubscribers);
-      
-      myDisplay.displayText(matrixMsg, PA_CENTER, 60, 2000, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-      myDisplay.displayReset();
-    }
-  }
-
-  if (hasNewMessage && (millis() - messageDisplayTime > MESSAGE_DURATION)) {
-    hasNewMessage = false;
-    myDisplay.displayClear();
   }
 
   static unsigned long lastOledUpdate = 0;

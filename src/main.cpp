@@ -218,6 +218,11 @@ void setup() {
   myDisplay.displayClear();
   myDisplay.setTextAlignment(PA_CENTER);
   
+  // 매트릭스 180도 회전 (뒤집기 설정)
+  myDisplay.setZone(0, 0, MAX_DEVICES - 1);
+  myDisplay.setZoneEffect(0, true, PA_FLIP_UD);
+  myDisplay.setZoneEffect(0, true, PA_FLIP_LR);
+  
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_unifont_t_korean1);
   u8g2.setCursor(10, 30);

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP8266 Smart Display - Preview</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --led-off: #334155;
+            --led-on: #ef4444; /* 빨간색 LED */
+            --oled-bg: #000000;
+            --oled-text: #38bdf8; /* 청록색 OLED */
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Inter', -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .title {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 28px; font-weight: 700; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p { margin: 0; color: #94a3b8; font-size: 15px; }
+        .container {
+            display: flex;
+            gap: 50px;
+            padding: 40px 50px;
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            align-items: center;
+        }
+        /* OLED 스타일 */
+        .oled-panel {
+            width: 256px;
+            height: 128px;
+            background: var(--oled-bg);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 4px solid #334155;
+            box-shadow: inset 0 0 15px rgba(255,255,255,0.1), 0 10px 20px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .oled-time {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--oled-text);
+            text-align: center;
+            margin-bottom: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            text-shadow: 0 0 5px var(--oled-text);
+        }
+        .oled-info {
+            font-size: 16px;
+            color: var(--oled-text);
+            text-align: center;
+            text-shadow: 0 0 3px var(--oled-text);
+        }
+        .oled-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #64748b;
+            letter-spacing: 1px;
+        }
+        /* 매트릭스 스타일 */
+        .matrix-wrapper {
+            position: relative;
+        }
+        .matrix-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #64748b;
+            letter-spacing: 1px;
+        }
+        .matrix-board {
+            display: grid;
+            grid-template-columns: repeat(8, 14px);
+            grid-template-rows: repeat(32, 14px);
+            gap: 2px;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.3);
+            border: 2px solid #334155;
+        }
+        .led {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: var(--led-off);
+            transition: background-color 0.05s, box-shadow 0.05s;
+        }
+        .led.on {
+            background-color: var(--led-on);
+            box-shadow: 0 0 8px var(--led-on), inset 0 0 2px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title">
+        <h1>ESP8266 Smart Display</h1>
+        <p>Live Web Preview of Auto-Tetris & OLED</p>
+    </div>
+
+    <div class="container">
+        <!-- OLED 시뮬레이션 -->
+        <div class="matrix-wrapper">
+            <div class="oled-label">OLED (128x64)</div>
+            <div class="oled-panel">
+                <div class="oled-time" id="oled-time">12:00:00</div>
+                <div class="oled-info" id="oled-info">YouTube: 1,234</div>
+            </div>
+        </div>
+
+        <!-- 8x32 매트릭스 시뮬레이션 -->
+        <div class="matrix-wrapper">
+            <div class="matrix-label">LED MATRIX (8x32)</div>
+            <div class="matrix-board" id="matrix"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- OLED 업데이트 로직 ---
+        function updateOLED() {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                            now.getMinutes().toString().padStart(2, '0') + ':' + 
+                            now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('oled-time').textContent = timeStr;
+            
+            // 번갈아가며 보여주기
+            const seconds = now.getSeconds();
+            if (Math.floor(seconds / 10) % 2 === 0) {
+                document.getElementById('oled-info').textContent = "Weather: 맑음, 24.5C";
+            } else {
+                document.getElementById('oled-info').textContent = "gihunham YT: 1,234명";
+            }
+        }
+        setInterval(updateOLED, 1000);
+        updateOLED();
+
+        // --- 오토 테트리스 엔진 로직 (C++ 코드 기반) ---
+        const BOARD_WIDTH = 8;
+        const BOARD_HEIGHT = 32;
+        const PIECES = [
+            [[0,0], [1,0], [0,1], [1,1]], // O
+            [[0,0], [0,1], [0,2], [0,3]], // I
+            [[0,0], [0,1], [0,2], [1,2]], // L
+            [[1,0], [1,1], [1,2], [0,2]], // J
+            [[0,1], [1,1], [1,0], [2,0]], // S
+            [[0,0], [1,0], [1,1], [2,1]], // Z
+            [[0,0], [1,0], [2,0], [1,1]]  // T
+        ];
+
+        let board = Array.from({length: BOARD_WIDTH}, () => Array(BOARD_HEIGHT).fill(0));
+        let currentPiece, pieceX, pieceY, rotation;
+        let targetX, targetRotation;
+        
+        let isGameOver = false;
+        let gameOverPhase = 0;
+        let gameOverY = 0;
+
+        const matrixDiv = document.getElementById('matrix');
+        const leds = [];
+
+        // DOM에 LED 생성
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const led = document.createElement('div');
+                led.className = 'led';
+                matrixDiv.appendChild(led);
+                leds.push(led);
+            }
+        }
+
+        // 매트릭스 그리기
+        function draw() {
+            leds.forEach(led => led.className = 'led'); // Clear
+
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                for (let y = 0; y < BOARD_HEIGHT; y++) {
+                    if (board[x][y]) {
+                        leds[y * BOARD_WIDTH + x].classList.add('on');
+                    }
+                }
+            }
+
+            if (!isGameOver) {
+                for (let i = 0; i < 4; i++) {
+                    let px = PIECES[currentPiece][i][0];
+                    let py = PIECES[currentPiece][i][1];
+                    for(let j=0; j<rotation; j++) { let t = px; px = 1-py; py = t; }
+                    let drawX = pieceX + px;
+                    let drawY = pieceY + py;
+                    if (drawX >= 0 && drawX < BOARD_WIDTH && drawY >= 0 && drawY < BOARD_HEIGHT) {
+                        leds[drawY * BOARD_WIDTH + drawX].classList.add('on');
+                    }
+                }
+            }
+        }
+
+        // 충돌 검사
+        function checkCollision(x, y, r, p = currentPiece) {
+            for (let i = 0; i < 4; i++) {
+                let px = PIECES[p][i][0];
+                let py = PIECES[p][i][1];
+                for(let j=0; j<r; j++) { let t = px; px = 1-py; py = t; }
+                let nx = x + px;
+                let ny = y + py;
+                if (nx < 0 || nx >= BOARD_WIDTH || ny >= BOARD_HEIGHT) return true;
+                if (ny >= 0 && board[nx][ny]) return true;
+            }
+            return false;
+        }
+
+        // 보드 점수 평가 (휴리스틱 AI)
+        function evaluateBoard(x, y, r) {
+            return -(y * -1.0) + Math.random(); // 최대한 낮게 쌓도록 유도
+        }
+
+        // 최적 위치 계산
+        function calculateBestMove() {
+            let bestScore = -1000000;
+            targetX = pieceX;
+            targetRotation = 0;
+
+            for (let r = 0; r < 4; r++) {
+                for (let x = -2; x < BOARD_WIDTH; x++) {
+                    let y = 0;
+                    while (!checkCollision(x, y + 1, r)) y++;
+                    if (checkCollision(x, y, r)) continue;
+
+                    let s = evaluateBoard(x, y, r);
+                    if (s > bestScore) {
+                        bestScore = s;
+                        targetX = x;
+                        targetRotation = r;
+                    }
+                }
+            }
+        }
+
+        // 블록 생성
+        function spawnPiece() {
+            currentPiece = Math.floor(Math.random() * 7);
+            pieceX = Math.floor(BOARD_WIDTH / 2) - 1;
+            pieceY = 0;
+            rotation = 0;
+            calculateBestMove();
+            
+            // 생성되자마자 충돌하면 게임 오버
+            if (checkCollision(pieceX, pieceY, rotation)) {
+                isGameOver = true;
+                gameOverPhase = 1;
+                gameOverY = 0;
+            }
+        }
+
+        // 블록 고정 및 라인 삭제
+        function lockPiece() {
+            for (let i = 0; i < 4; i++) {
+                let px = PIECES[currentPiece][i][0];
+                let py = PIECES[currentPiece][i][1];
+                for(let j=0; j<rotation; j++) { let t = px; px = 1-py; py = t; }
+                if (pieceY + py >= 0) board[pieceX + px][pieceY + py] = 1;
+            }
+            
+            // 라인 삭제 로직
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                let full = true;
+                for (let x = 0; x < BOARD_WIDTH; x++) if (!board[x][y]) full = false;
+                if (full) {
+                    for (let ty = y; ty > 0; ty--) {
+                        for (let tx = 0; tx < BOARD_WIDTH; tx++) {
+                            board[tx][ty] = board[tx][ty - 1];
+                        }
+                    }
+                    for (let tx = 0; tx < BOARD_WIDTH; tx++) board[tx][0] = 0;
+                    y++; // 현재 라인 재검사
+                }
+            }
+        }
+
+        function reset() {
+            board = Array.from({length: BOARD_WIDTH}, () => Array(BOARD_HEIGHT).fill(0));
+            isGameOver = false;
+            gameOverPhase = 0;
+            spawnPiece();
+        }
+
+        // 메인 게임 루프 (C++의 update 함수 역할)
+        function gameLoop() {
+            if (isGameOver) {
+                // 게임 오버 애니메이션
+                if (gameOverPhase === 1) {
+                    for (let x = 0; x < BOARD_WIDTH; x++) board[x][gameOverY] = 1;
+                    gameOverY++;
+                    if (gameOverY >= BOARD_HEIGHT) {
+                        gameOverPhase = 2;
+                        gameOverY = BOARD_HEIGHT - 1;
+                    }
+                } else if (gameOverPhase === 2) {
+                    for (let x = 0; x < BOARD_WIDTH; x++) board[x][gameOverY] = 0;
+                    gameOverY--;
+                    if (gameOverY < 0) {
+                        reset();
+                    }
+                }
+                draw();
+                setTimeout(gameLoop, 30); // 애니메이션 속도
+                return;
+            }
+
+            // 블록 이동 로직
+            if (rotation !== targetRotation) {
+                rotation = (rotation + 1) % 4;
+            } else if (pieceX < targetX) {
+                pieceX++;
+            } else if (pieceX > targetX) {
+                pieceX--;
+            } else if (!checkCollision(pieceX, pieceY + 1, rotation)) {
+                pieceY++;
+            } else {
+                lockPiece();
+                spawnPiece();
+            }
+
+            draw();
+            setTimeout(gameLoop, 100); // 블록 떨어지는 속도
+        }
+
+        // 초기화 및 시작
+        reset();
+        gameLoop();
+    </script>
+</body>
+</html>

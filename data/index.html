@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Retro Display</title>
+    <meta name="description" content="Dashboard and Game Controller for ESP8266 Retro Display">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-anim"></div>
+    <div class="container">
+        <header class="header">
+            <div class="status-indicator" id="ws-status"></div>
+            <h1>Smart Display</h1>
+            <p>Retro IoT Console</p>
+        </header>
+
+        <main>
+            <section class="card mode-selector">
+                <h2>Operating Mode</h2>
+                <div class="toggle-group">
+                    <button class="btn active" id="btn-dashboard" onclick="setMode(0)">Dashboard</button>
+                    <button class="btn" id="btn-game" onclick="setMode(1)">Game Mode</button>
+                </div>
+            </section>
+
+            <section class="card controller-section" id="game-controller">
+                <h2>Breakout Controller</h2>
+                <div class="d-pad">
+                    <button class="pad-btn" id="btn-left">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <div class="pad-center"></div>
+                    <button class="pad-btn" id="btn-right">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                </div>
+                <p class="hint">Press and hold to move paddle</p>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

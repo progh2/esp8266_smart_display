@@ -307,7 +307,7 @@ public:
     return -(y * -1.0) + (random(0, 100) / 100.0); // 임시: 낮게 쌓기 우선
   }
 
-  void update() {
+  void update(MD_MAX72XX *mx) {
     if (isGameOver) {
       if (millis() - lastGameOverStep > 30) { // 애니메이션 속도 조절
         if (gameOverPhase == 1) {
@@ -335,33 +335,74 @@ public:
       else if (pieceX > targetX) pieceX--;
       else if (!checkCollision(pieceX, pieceY + 1, rotation)) pieceY++;
       else {
-        lockPiece();
+        lockPiece(mx);
         spawnPiece();
       }
       lastDrop = millis();
     }
   }
 
-  void lockPiece() {
+  void lockPiece(MD_MAX72XX *mx) {
     for (int i = 0; i < 4; i++) {
       int px = PIECES[currentPiece][i][0];
       int py = PIECES[currentPiece][i][1];
       for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
       if (pieceY + py >= 0) board[pieceX + px][pieceY + py] = 1;
     }
-    clearLines();
+    clearLines(mx);
   }
 
-  void clearLines() {
-    for (int y = BOARD_HEIGHT - 1; y >= 0; y--) {
+  void clearLines(MD_MAX72XX *mx) {
+    bool lines[BOARD_HEIGHT] = {false};
+    int clearCount = 0;
+    
+    // 1. 꽉 찬 줄 찾기
+    for (int y = 0; y < BOARD_HEIGHT; y++) {
       bool full = true;
       for (int x = 0; x < BOARD_WIDTH; x++) if (!board[x][y]) full = false;
       if (full) {
-        score++;
-        for (int ty = y; ty > 0; ty--)
-          for (int tx = 0; tx < BOARD_WIDTH; tx++) board[tx][ty] = board[tx][ty - 1];
-        y++;
+        lines[y] = true;
+        clearCount++;
       }
+    }
+
+    if (clearCount > 0) {
+      // 2. 팡! 효과 애니메이션
+      // 2-1. 깜빡임 (Flash)
+      for(int blink = 0; blink < 2; blink++) {
+          for (int y = 0; y < BOARD_HEIGHT; y++) {
+             if (lines[y]) {
+                 for(int x=0; x<BOARD_WIDTH; x++) board[x][y] = (blink == 0 ? 0 : 1);
+             }
+          }
+          draw(mx);
+          delay(40);
+      }
+      // 2-2. 가운데서 양옆으로 퍼지며 사라짐 (Spread)
+      for(int step = 0; step < 4; step++) {
+          for (int y = 0; y < BOARD_HEIGHT; y++) {
+             if (lines[y]) {
+                 board[3 - step][y] = 0;
+                 board[4 + step][y] = 0;
+             }
+          }
+          draw(mx);
+          delay(30);
+      }
+
+      // 3. 실제 줄 내리기 로직
+      int writeY = BOARD_HEIGHT - 1;
+      for (int readY = BOARD_HEIGHT - 1; readY >= 0; readY--) {
+        if (!lines[readY]) {
+          for (int x = 0; x < BOARD_WIDTH; x++) board[x][writeY] = board[x][readY];
+          writeY--;
+        }
+      }
+      // 맨 위 빈 공간 0으로 채우기
+      for (; writeY >= 0; writeY--) {
+        for (int x = 0; x < BOARD_WIDTH; x++) board[x][writeY] = 0;
+      }
+      score += clearCount;
     }
   }
 
@@ -480,7 +521,7 @@ void loop() {
     }
   } else {
     // 메시지가 없을 때는 항상 테트리스 실행
-    tetris.update();
+    tetris.update(myDisplay.getGraphicObject());
     tetris.draw(myDisplay.getGraphicObject());
   }
 

@@ -334,6 +334,9 @@ public:
   }
 
   void draw(MD_MAX72XX *mx) {
+    // 업데이트를 잠시 멈춰 깜빡임(Flicker) 방지
+    mx->control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+    
     mx->clear();
     for (int x = 0; x < BOARD_WIDTH; x++)
       for (int y = 0; y < BOARD_HEIGHT; y++)
@@ -345,6 +348,9 @@ public:
       for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
       mx->setPoint(pieceX + px, 31 - (pieceY + py), true);
     }
+    
+    // 화면에 한 번에 출력
+    mx->control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
   }
 };
 

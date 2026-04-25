@@ -30,10 +30,10 @@ U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/ 12, /* data=*/ 14,
 
 // 2. 매트릭스 설정
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 1
-#define CS_PIN  4  // D2
-#define DATA_PIN 13 // D7
-#define CLK_PIN 5  // D1
+#define MAX_DEVICES 4  // 4개 모듈 기준 (보통 1세트)
+#define CS_PIN  4      // D2
+#define DATA_PIN 13    // D7
+#define CLK_PIN 5      // D1
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
 // 상태 변수
@@ -214,8 +214,9 @@ void setup() {
   u8g2.begin();
   u8g2.enableUTF8Print();
   myDisplay.begin();
-  myDisplay.setIntensity(3); 
+  myDisplay.setIntensity(8); 
   myDisplay.displayClear();
+  myDisplay.setTextAlignment(PA_CENTER);
   
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_unifont_t_korean1);
@@ -277,9 +278,11 @@ void loop() {
     if (hasNewMessage) {
       myDisplay.displayReset();
     } else {
-      // 매트릭스에 항상 유튜브 구독자 수 표시 (스크롤)
-      String subStr = "YT: " + String(ytSubscribers) + "  ";
-      myDisplay.displayText(subStr.c_str(), PA_CENTER, 60, 2000, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+      // 전역/정적 버퍼를 사용하여 메모리 누수 및 포인터 오류 방지
+      static char matrixMsg[40];
+      snprintf(matrixMsg, sizeof(matrixMsg), "YT: %d    ", ytSubscribers);
+      
+      myDisplay.displayText(matrixMsg, PA_CENTER, 60, 2000, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
       myDisplay.displayReset();
     }
   }

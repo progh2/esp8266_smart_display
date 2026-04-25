@@ -367,17 +367,19 @@ public:
     }
 
     if (clearCount > 0) {
-      // 2. 팡! 효과 애니메이션
-      // 2-1. 깜빡임 (Flash)
-      for(int blink = 0; blink < 2; blink++) {
+      // 2. 지진 + 팡! 효과 애니메이션
+      // 2-1. 지진(Shake) & 깜빡임(Flash)
+      int shakeOffsets[] = {1, -2, 1, -1, 0}; // 좌우로 강하게 흔들림
+      for(int blink = 0; blink < 5; blink++) {
           for (int y = 0; y < BOARD_HEIGHT; y++) {
              if (lines[y]) {
-                 for(int x=0; x<BOARD_WIDTH; x++) board[x][y] = (blink == 0 ? 0 : 1);
+                 for(int x=0; x<BOARD_WIDTH; x++) board[x][y] = (blink % 2 == 0 ? 0 : 1);
              }
           }
-          draw(mx);
-          delay(40);
+          draw(mx, shakeOffsets[blink]);
+          delay(30);
       }
+      
       // 2-2. 가운데서 양옆으로 퍼지며 사라짐 (Spread)
       for(int step = 0; step < 4; step++) {
           for (int y = 0; y < BOARD_HEIGHT; y++) {
@@ -386,8 +388,8 @@ public:
                  board[4 + step][y] = 0;
              }
           }
-          draw(mx);
-          delay(30);
+          draw(mx, 0);
+          delay(20);
       }
 
       // 3. 실제 줄 내리기 로직
@@ -406,21 +408,30 @@ public:
     }
   }
 
-  void draw(MD_MAX72XX *mx) {
+  void draw(MD_MAX72XX *mx, int shakeOffset = 0) {
     // 업데이트를 잠시 멈춰 깜빡임(Flicker) 방지
     mx->control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
     
     mx->clear();
     for (int x = 0; x < BOARD_WIDTH; x++)
-      for (int y = 0; y < BOARD_HEIGHT; y++)
-        if (board[x][y]) mx->setPoint(x, 31 - y, true);
+      for (int y = 0; y < BOARD_HEIGHT; y++) {
+        if (board[x][y]) {
+          int drawX = x + shakeOffset;
+          if (drawX >= 0 && drawX < BOARD_WIDTH) {
+            mx->setPoint(drawX, 31 - y, true);
+          }
+        }
+      }
 
     if (!isGameOver) {
       for (int i = 0; i < 4; i++) {
         int px = PIECES[currentPiece][i][0];
         int py = PIECES[currentPiece][i][1];
         for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
-        mx->setPoint(pieceX + px, 31 - (pieceY + py), true);
+        int drawX = pieceX + px + shakeOffset;
+        if (drawX >= 0 && drawX < BOARD_WIDTH) {
+          mx->setPoint(drawX, 31 - (pieceY + py), true);
+        }
       }
     }
     

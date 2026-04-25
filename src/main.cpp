@@ -42,9 +42,15 @@ bool hasNewMessage = false;
 unsigned long messageDisplayTime = 0;
 const unsigned long MESSAGE_DURATION = 15000;
 
-int currentMode = 0; // 0: 시계/날씨, 1: 유튜브
+const unsigned long MODE_INTERVAL = 15000; 
+
+int currentMode = 0; 
 unsigned long lastModeChange = 0;
-const unsigned long MODE_INTERVAL = 10000;
+
+// 테트리스 설정
+#define BOARD_WIDTH 8
+#define BOARD_HEIGHT 32
+const int TETRIS_MODE = 2;
 
 // 날씨 데이터 변수
 String weatherString = "업데이트 중...";
@@ -208,6 +214,143 @@ void updateOLED() {
   u8g2.sendBuffer();
 }
 
+// --- 테트리스 엔진 시작 ---
+const uint8_t PIECES[7][4][2] = {
+  {{0,0}, {1,0}, {0,1}, {1,1}}, // O
+  {{0,0}, {0,1}, {0,2}, {0,3}}, // I
+  {{0,0}, {0,1}, {0,2}, {1,2}}, // L
+  {{1,0}, {1,1}, {1,2}, {0,2}}, // J
+  {{0,1}, {1,1}, {1,0}, {2,0}}, // S
+  {{0,0}, {1,0}, {1,1}, {2,1}}, // Z
+  {{0,0}, {1,0}, {2,0}, {1,1}}  // T
+};
+
+class TetrisGame {
+public:
+  uint8_t board[BOARD_WIDTH][BOARD_HEIGHT];
+  int currentPiece;
+  int pieceX, pieceY, rotation;
+  int targetX, targetRotation;
+  unsigned long lastDrop = 0;
+  int score = 0;
+
+  TetrisGame() { reset(); }
+
+  void reset() {
+    memset(board, 0, sizeof(board));
+    score = 0;
+    spawnPiece();
+  }
+
+  void spawnPiece() {
+    currentPiece = random(0, 7);
+    pieceX = BOARD_WIDTH / 2 - 1;
+    pieceY = 0;
+    rotation = 0;
+    calculateBestMove();
+    if (checkCollision(pieceX, pieceY, rotation)) reset();
+  }
+
+  bool checkCollision(int x, int y, int r, int p = -1) {
+    if (p == -1) p = currentPiece;
+    for (int i = 0; i < 4; i++) {
+      int px = PIECES[p][i][0];
+      int py = PIECES[p][i][1];
+      // 회전 로직 (단순화)
+      for(int j=0; j<r; j++) { int t = px; px = 1-py; py = t; }
+      int nx = x + px;
+      int ny = y + py;
+      if (nx < 0 || nx >= BOARD_WIDTH || ny >= BOARD_HEIGHT) return true;
+      if (ny >= 0 && board[nx][ny]) return true;
+    }
+    return false;
+  }
+
+  void calculateBestMove() {
+    float bestScore = -1000000;
+    targetX = pieceX;
+    targetRotation = 0;
+
+    for (int r = 0; r < 4; r++) {
+      for (int x = -2; x < BOARD_WIDTH; x++) {
+        int y = 0;
+        while (!checkCollision(x, y + 1, r)) y++;
+        if (checkCollision(x, y, r)) continue;
+
+        float s = evaluateBoard(x, y, r);
+        if (s > bestScore) {
+          bestScore = s;
+          targetX = x;
+          targetRotation = r;
+        }
+      }
+    }
+  }
+
+  float evaluateBoard(int x, int y, int r) {
+    // 가상의 보드 시뮬레이션 및 점수 계산
+    int lines = 0;
+    int holes = 0;
+    int aggregateHeight = 0;
+    // ... (간략화된 휴리스틱)
+    return -(y * -1.0) + (random(0, 100) / 100.0); // 임시: 낮게 쌓기 우선
+  }
+
+  void update() {
+    if (millis() - lastDrop > 100) {
+      if (rotation != targetRotation) rotation = (rotation + 1) % 4;
+      else if (pieceX < targetX) pieceX++;
+      else if (pieceX > targetX) pieceX--;
+      else if (!checkCollision(pieceX, pieceY + 1, rotation)) pieceY++;
+      else {
+        lockPiece();
+        spawnPiece();
+      }
+      lastDrop = millis();
+    }
+  }
+
+  void lockPiece() {
+    for (int i = 0; i < 4; i++) {
+      int px = PIECES[currentPiece][i][0];
+      int py = PIECES[currentPiece][i][1];
+      for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
+      if (pieceY + py >= 0) board[pieceX + px][pieceY + py] = 1;
+    }
+    clearLines();
+  }
+
+  void clearLines() {
+    for (int y = BOARD_HEIGHT - 1; y >= 0; y--) {
+      bool full = true;
+      for (int x = 0; x < BOARD_WIDTH; x++) if (!board[x][y]) full = false;
+      if (full) {
+        score++;
+        for (int ty = y; ty > 0; ty--)
+          for (int tx = 0; tx < BOARD_WIDTH; tx++) board[tx][ty] = board[tx][ty - 1];
+        y++;
+      }
+    }
+  }
+
+  void draw(MD_MAX72XX *mx) {
+    mx->clear();
+    for (int x = 0; x < BOARD_WIDTH; x++)
+      for (int y = 0; y < BOARD_HEIGHT; y++)
+        if (board[x][y]) mx->setPoint(31 - y, x, true);
+
+    for (int i = 0; i < 4; i++) {
+      int px = PIECES[currentPiece][i][0];
+      int py = PIECES[currentPiece][i][1];
+      for(int j=0; j<rotation; j++) { int t = px; px = 1-py; py = t; }
+      mx->setPoint(31 - (pieceY + py), pieceX + px, true);
+    }
+  }
+};
+
+TetrisGame tetris;
+// --- 테트리스 엔진 끝 ---
+
 void setup() {
   Serial.begin(115200);
   
@@ -279,7 +422,17 @@ void loop() {
     lastYouTubeUpdate = millis();
   }
   
-  if (myDisplay.displayAnimate()) {
+  if (!hasNewMessage && (millis() - lastModeChange > MODE_INTERVAL)) {
+    currentMode = (currentMode + 1) % 3; 
+    lastModeChange = millis();
+    myDisplay.displayClear();
+    if (currentMode == TETRIS_MODE) tetris.reset();
+  }
+
+  if (currentMode == TETRIS_MODE) {
+    tetris.update();
+    tetris.draw(myDisplay.getGraphicObject());
+  } else if (myDisplay.displayAnimate()) {
     if (hasNewMessage) {
       myDisplay.displayReset();
     } else {
@@ -294,12 +447,6 @@ void loop() {
 
   if (hasNewMessage && (millis() - messageDisplayTime > MESSAGE_DURATION)) {
     hasNewMessage = false;
-    myDisplay.displayClear();
-  }
-
-  if (!hasNewMessage && (millis() - lastModeChange > MODE_INTERVAL)) {
-    currentMode = (currentMode + 1) % 2; 
-    lastModeChange = millis();
     myDisplay.displayClear();
   }
 
